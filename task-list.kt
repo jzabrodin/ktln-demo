@@ -83,6 +83,7 @@ class Task {
 
     fun setId(id: Int) {
         this.id = id
+        this.id = this.id!! + 1
     }
 
     fun getDueTag(): String {
@@ -112,10 +113,7 @@ class Task {
         stringBuilder.appendLine("${this.id}$divider$date ${dateTime!!.hour}:${dateTime!!.minute} $priority ${this.getDueTag()}")
 
         for (task in buffer) {
-            for (i in 1..task.lastIndex) {
-                stringBuilder.appendLine("$subDivider${task[i]}")
-            }
-            stringBuilder.appendLine("")
+            stringBuilder.appendLine("$subDivider${task}")
         }
 
         return stringBuilder.toString()
@@ -193,15 +191,15 @@ class TaskAdder {
 
 class TaskDeleter {
     fun delete(index: Int): Boolean {
-        val taskSelector :TaskSelector = TaskSelector()
+        val taskSelector: TaskSelector = TaskSelector()
         var isDeleted = false
 
         val task = taskSelector.getTaskById(index)
-        if(task != null){
+        if (task != null) {
             isDeleted = tasks.remove(task)
         }
 
-        if(isDeleted){
+        if (isDeleted) {
             println("The task is deleted")
         }
 
@@ -210,7 +208,7 @@ class TaskDeleter {
 }
 
 class TaskEditor {
-    val taskSelector :TaskSelector = TaskSelector()
+    val taskSelector: TaskSelector = TaskSelector()
     val taskAdder: TaskAdder = TaskAdder()
     var EDITABLE_FIELDS = listOf("priority", "date", "time", "task")
 
@@ -218,35 +216,41 @@ class TaskEditor {
         var isTaskChanged = false
         var isCorrectField = false
 
-        var field = ""
-        while (!isCorrectField) {
-            println("Input a field to edit (priority, date, time, task):")
-            field = readln().trim().lowercase()
-            isCorrectField = EDITABLE_FIELDS.contains(field)
-            if(!isCorrectField){
-                println("Invalid field")
-            }
-        }
-
         val task = taskSelector.getTaskById(index)
-        if(task != null){
-            when(field){
+
+        if (task != null) {
+
+            var field = ""
+            while (!isCorrectField) {
+                println("Input a field to edit (priority, date, time, task):")
+                field = readln().trim().lowercase()
+                isCorrectField = EDITABLE_FIELDS.contains(field)
+                if (!isCorrectField) {
+                    println("Invalid field")
+                }
+            }
+
+            when (field) {
                 "priority" -> {
                     taskAdder.setPriority(task)
                     isTaskChanged = true
                 }
+
                 "date" -> {
                     taskAdder.setDate(task)
                     isTaskChanged = true
                 }
+
                 "time" -> {
                     taskAdder.setTime(task)
                     isTaskChanged = true
                 }
+
                 "task" -> {
                     taskAdder.setTaskBuffer(task)
                     isTaskChanged = true
                 }
+
                 else -> {
                     isTaskChanged = false
                     println("Invalid field")
@@ -254,7 +258,7 @@ class TaskEditor {
             }
         }
 
-        if(isTaskChanged){
+        if (isTaskChanged) {
             println("The task is changed")
         }
 
@@ -295,10 +299,10 @@ class TaskSelector {
     }
 
     fun getTaskById(index: Int): Task? {
-        var result:Task? = null
+        var result: Task? = null
 
-        for (task in tasks){
-            if(task.id == index){
+        for (task in tasks) {
+            if (task.id == index) {
                 result = task
             }
         }
@@ -346,12 +350,14 @@ class CommandProcessor {
                 }
 
                 COMMAND_EDIT -> {
+                    result = true
                     tasksPrinter.printTasks()
                     val taskNumber: Int = taskSelector.select()
                     taskEditor.edit(taskNumber)
                 }
 
                 COMMAND_DELETE -> {
+                    result = true
                     tasksPrinter.printTasks()
                     val taskNumber: Int = taskSelector.select()
                     taskDeleter.delete(taskNumber)
