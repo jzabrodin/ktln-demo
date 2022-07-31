@@ -2,6 +2,7 @@ package tasklist
 
 import kotlinx.datetime.*
 import java.time.DateTimeException
+import java.time.format.DateTimeFormatter
 
 var tasks = mutableListOf<Task>()
 
@@ -14,7 +15,6 @@ class TasksPrinter {
 }
 
 class Task {
-    var date: LocalDate? = null
     var priority: String = ""
     var dateTime: LocalDateTime? = null
     var buffer = mutableListOf<String>()
@@ -44,7 +44,7 @@ class Task {
             val month = splitDate[1].toInt()
             val day = splitDate[2].toInt()
             try {
-                date = LocalDate(year, month, day)
+                dateTime = LocalDateTime(year, month, day, 0, 0)
             } catch (e: DateTimeException) {
                 println("The input date is invalid")
                 isDateCorrect = false
@@ -68,7 +68,8 @@ class Task {
             try {
                 val hour = split[0].toInt()
                 val minutes = split[1].toInt()
-                dateTime = LocalDateTime(date!!.year, date!!.month, date!!.dayOfMonth, hour, minutes)
+                val tmp = LocalDateTime(dateTime!!.year, dateTime!!.month,dateTime!!.dayOfMonth,hour,minutes)
+                dateTime = tmp
             } catch (e: DateTimeException) {
                 isTimeCorrect = false
                 println("The input time is invalid")
@@ -86,9 +87,9 @@ class Task {
         this.id = this.id!! + 1
     }
 
-    fun getDueTag(): String {
+    private fun getDueTag(): String {
         val currentDate = Clock.System.now().toLocalDateTime(TimeZone.of("UTC+0")).date
-        val numberOfDays = currentDate.daysUntil(date!!)
+        val numberOfDays = currentDate.daysUntil(dateTime!!.date)
 
         return if (numberOfDays == 0) {
             "T"
@@ -110,7 +111,8 @@ class Task {
             subDivider = "   "
         }
 
-        stringBuilder.appendLine("${this.id}$divider$date ${dateTime!!.hour}:${dateTime!!.minute} $priority ${this.getDueTag()}")
+        val string = dateTime.toString().replace("T", " ")
+        stringBuilder.appendLine("${this.id}$divider$string $priority ${this.getDueTag()}")
 
         for (task in buffer) {
             stringBuilder.appendLine("$subDivider${task}")
@@ -191,12 +193,17 @@ class TaskAdder {
 
 class TaskDeleter {
     fun delete(index: Int): Boolean {
-        val taskSelector: TaskSelector = TaskSelector()
+        val taskSelector = TaskSelector()
         var isDeleted = false
 
         val task = taskSelector.getTaskById(index)
         if (task != null) {
             isDeleted = tasks.remove(task)
+
+            recalculateTaskNumbers()
+
+        } else {
+            println("No tasks have been input")
         }
 
         if (isDeleted) {
@@ -204,6 +211,12 @@ class TaskDeleter {
         }
 
         return isDeleted
+    }
+
+    private fun recalculateTaskNumbers() {
+        for ((index, task) in tasks.withIndex()) {
+            task.setId(index)
+        }
     }
 }
 
@@ -256,6 +269,8 @@ class TaskEditor {
                     println("Invalid field")
                 }
             }
+        } else {
+            println("No tasks have been input")
         }
 
         if (isTaskChanged) {
@@ -280,6 +295,8 @@ class TaskSelector {
                 isValidTaskNumber = this.isValidTaskNumber(taskNumberInput)
                 if (isValidTaskNumber) {
                     index = taskNumberInput.toInt()
+                } else {
+                    println("Invalid task number")
                 }
             }
         }
@@ -291,8 +308,16 @@ class TaskSelector {
 
         var isValidTaskNumber = false
 
-        if (taskNumber.toInt() in 1..tasks.size) {
-            isValidTaskNumber = true
+        var toInt = 0
+
+        try {
+            toInt = taskNumber.toInt()
+
+            if (toInt in 1..tasks.size) {
+                isValidTaskNumber = true
+            }
+        } catch (e : NumberFormatException){
+            isValidTaskNumber = false
         }
 
         return isValidTaskNumber
