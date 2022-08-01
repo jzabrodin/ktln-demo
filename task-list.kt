@@ -3,6 +3,7 @@ package tasklist
 import kotlinx.datetime.*
 import java.time.DateTimeException
 import java.time.format.DateTimeFormatter
+import kotlin.math.min
 
 var tasks = mutableListOf<Task>()
 
@@ -14,7 +15,7 @@ class TasksPrinter {
 
     fun printTasks() {
 
-        if (tasks.isEmpty()){
+        if (tasks.isEmpty()) {
             return
         }
 
@@ -36,7 +37,7 @@ class TasksPrinter {
 
             for (stringBuilder in stringBuilderList) {
                 for (string in stringBuilder.split("\n")) {
-                    if(string.isEmpty()){
+                    if (string.isEmpty()) {
                         continue
                     }
                     val padEnd = string.padEnd(MAX_LENGTH, ' ')
@@ -104,15 +105,12 @@ class TasksPrinter {
             val stringBuilder = StringBuilder()
             if (bufferTask.length > MAX_LENGTH) {
                 var startIndex = 0
-                var finishIndex = MAX_LENGTH - 1
-                while (finishIndex < bufferTask.lastIndex) {
-                    stringBuilder.appendLine(bufferTask.substring(startIndex, finishIndex))
+                var finishIndex = MAX_LENGTH
+                while (startIndex != finishIndex) {
+                    val substring = bufferTask.substring(startIndex, finishIndex)
+                    stringBuilder.appendLine(substring)
                     startIndex = finishIndex
-                    finishIndex = if ((finishIndex + MAX_LENGTH) > bufferTask.lastIndex) {
-                        bufferTask.lastIndex
-                    } else {
-                        finishIndex + MAX_LENGTH
-                    }
+                    finishIndex = min(bufferTask.lastIndex+1, finishIndex+MAX_LENGTH)
                 }
 
             } else {
@@ -534,7 +532,7 @@ fun main() {
     val commandProcessor = CommandProcessor()
     while (true) {
         println("Input an action (${commandProcessor.SUPPLIED_COMMANDS.joinToString(", ")}):")
-        val task = readln().trim()
+        val task = readln().trim().lowercase()
         val commandResult = commandProcessor.process(task)
 
         if (!commandResult) {
