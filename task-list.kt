@@ -7,10 +7,122 @@ import java.time.format.DateTimeFormatter
 var tasks = mutableListOf<Task>()
 
 class TasksPrinter {
+
+    val divider = "+----+------------+-------+---+---+--------------------------------------------+"
+    val header = "| N  |    Date    | Time  | P | D |                   Task                     |"
+    val MAX_LENGTH = 44
+
     fun printTasks() {
-        for (task in tasks) {
-            println(task.toString())
+
+        if (tasks.isEmpty()){
+            return
         }
+
+//        +----+------------+-------+---+---+--------------------------------------------+
+//        | N  |    Date    | Time  | P | D |                   Task                     |
+//        +----+------------+-------+---+---+--------------------------------------------+
+//        | 1  | yyyy-MM-dd | hh:mm |   |   |                                            |
+//        |    |            |       |   |   |                                            |
+//        |    |            |       |   |   |                                            |
+//        +----+------------+-------+---+---+--------------------------------------------+
+
+        println(divider)
+        println(header)
+        println(divider)
+
+        for (task in tasks) {
+            val stringBuilderList = prepareTaskText(task)
+            var isDataShowed = false
+
+            for (stringBuilder in stringBuilderList) {
+                for (string in stringBuilder.split("\n")) {
+                    if(string.isEmpty()){
+                        continue
+                    }
+                    val padEnd = string.padEnd(MAX_LENGTH, ' ')
+
+                    if (!isDataShowed) {
+                        val dateTimeArray = task.dateTime.toString().replace("T", " ").split(" ")
+                        val date = dateTimeArray[0]
+                        val time = dateTimeArray[1]
+                        val dueTagColor = getDueTagColor(task)
+                        val priorityColor = getPriorityColor(task)
+                        println("| ${task.id}${task.getTaskDivider()}| $date | $time | $priorityColor | $dueTagColor |$padEnd|")
+                        isDataShowed = true
+                    } else {
+                        println("|    |            |       |   |   |$padEnd|")
+                    }
+                }
+            }
+            println(divider)
+        }
+    }
+
+
+    private fun getPriorityColor(task: Task): String {
+
+
+        return when (task.priority) {
+            "C" -> {
+                "\u001B[101m \u001B[0m"
+            }
+
+            "H" -> {
+                "\u001B[103m \u001B[0m"
+            }
+
+            "N" -> {
+                "\u001B[102m \u001B[0m"
+            }
+
+            else -> {
+                "\u001B[104m \u001B[0m"
+            }
+        }
+    }
+
+    private fun getDueTagColor(task: Task): String {
+        return when (task.dueTag) {
+            "I" -> {
+                "\u001B[102m \u001B[0m"
+            }
+
+            "T" -> {
+                "\u001B[103m \u001B[0m"
+            }
+
+            else -> {
+                "\u001B[101m \u001B[0m"
+            }
+        }
+    }
+
+    private fun prepareTaskText(task: Task): MutableList<StringBuilder> {
+        val newBuffer = mutableListOf<StringBuilder>()
+
+        for (bufferTask in task.buffer) {
+            val stringBuilder = StringBuilder()
+            if (bufferTask.length > MAX_LENGTH) {
+                var startIndex = 0
+                var finishIndex = MAX_LENGTH - 1
+                while (finishIndex < bufferTask.lastIndex) {
+                    stringBuilder.appendLine(bufferTask.substring(startIndex, finishIndex))
+                    startIndex = finishIndex
+                    finishIndex = if ((finishIndex + MAX_LENGTH) > bufferTask.lastIndex) {
+                        bufferTask.lastIndex
+                    } else {
+                        finishIndex + MAX_LENGTH
+                    }
+                }
+
+            } else {
+                stringBuilder.appendLine(bufferTask)
+            }
+
+            newBuffer.add(stringBuilder)
+        }
+
+        return newBuffer
     }
 }
 
@@ -19,6 +131,7 @@ class Task {
     var dateTime: LocalDateTime? = null
     var buffer = mutableListOf<String>()
     var id: Int? = null
+    var dueTag: String = ""
 
     private val CORRECT_PRIORITIES = mutableListOf("C", "H", "N", "L")
 
@@ -45,6 +158,7 @@ class Task {
             val day = splitDate[2].toInt()
             try {
                 dateTime = LocalDateTime(year, month, day, 0, 0)
+                this.dueTag = getDueTag()
             } catch (e: DateTimeException) {
                 println("The input date is invalid")
                 isDateCorrect = false
@@ -68,7 +182,7 @@ class Task {
             try {
                 val hour = split[0].toInt()
                 val minutes = split[1].toInt()
-                val tmp = LocalDateTime(dateTime!!.year, dateTime!!.month,dateTime!!.dayOfMonth,hour,minutes)
+                val tmp = LocalDateTime(dateTime!!.year, dateTime!!.month, dateTime!!.dayOfMonth, hour, minutes)
                 dateTime = tmp
             } catch (e: DateTimeException) {
                 isTimeCorrect = false
@@ -87,7 +201,7 @@ class Task {
         this.id = this.id!! + 1
     }
 
-    private fun getDueTag(): String {
+    internal fun getDueTag(): String {
         val currentDate = Clock.System.now().toLocalDateTime(TimeZone.of("UTC+0")).date
         val numberOfDays = currentDate.daysUntil(dateTime!!.date)
 
@@ -100,19 +214,34 @@ class Task {
         }
     }
 
-    override fun toString(): String {
-        val stringBuilder = StringBuilder()
-
+    fun getTaskDivider(): String {
         var divider = "  "
-        var subDivider = "   "
 
         if (id!! >= 10) {
             divider = " "
+        }
+
+        return divider
+    }
+
+    fun getTaskSubDivider(): String {
+        var subDivider = "   "
+
+        if (id!! >= 10) {
             subDivider = "   "
         }
 
+        return subDivider
+    }
+
+    override fun toString(): String {
+        val stringBuilder = StringBuilder()
+
+        val divider = this.getTaskDivider()
+        val subDivider = this.getTaskSubDivider()
+
         val string = dateTime.toString().replace("T", " ")
-        stringBuilder.appendLine("${this.id}$divider$string $priority ${this.getDueTag()}")
+        stringBuilder.appendLine("${this.id}$divider$string $priority ${this.dueTag}")
 
         for (task in buffer) {
             stringBuilder.appendLine("$subDivider${task}")
@@ -120,7 +249,6 @@ class Task {
 
         return stringBuilder.toString()
     }
-
 
 }
 
@@ -316,7 +444,7 @@ class TaskSelector {
             if (toInt in 1..tasks.size) {
                 isValidTaskNumber = true
             }
-        } catch (e : NumberFormatException){
+        } catch (e: NumberFormatException) {
             isValidTaskNumber = false
         }
 
