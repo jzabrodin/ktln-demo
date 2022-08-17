@@ -1,17 +1,39 @@
 package tasklist
 
+import com.squareup.moshi.JsonAdapter
+import com.squareup.moshi.JsonClass
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.Types
+import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import kotlinx.datetime.*
+import java.io.File
 import java.time.DateTimeException
-import java.time.format.DateTimeFormatter
 import kotlin.math.min
 
 var tasks = mutableListOf<Task>()
 
+enum class PRIORITY(val priority: String) {
+    CRITICAL("C"),
+    HIGH("H"),
+    NORMAL("N"),
+    LOW("L");
+
+    companion object {
+        fun isCorrectPriority(value: String): Boolean {
+            return values().find { it.priority == value } != null
+        }
+
+        fun priorityByString(value: String): PRIORITY? {
+            return values().find { it.priority == value }
+        }
+    }
+}
+
 class TasksPrinter {
 
-    val divider = "+----+------------+-------+---+---+--------------------------------------------+"
-    val header = "| N  |    Date    | Time  | P | D |                   Task                     |"
-    val MAX_LENGTH = 44
+    private val divider = "+----+------------+-------+---+---+--------------------------------------------+"
+    private val header = "| N  |    Date    | Time  | P | D |                   Task                     |"
+    private val MAX_LENGTH = 44
 
     fun printTasks() {
 
@@ -110,7 +132,7 @@ class TasksPrinter {
                     val substring = bufferTask.substring(startIndex, finishIndex)
                     stringBuilder.appendLine(substring)
                     startIndex = finishIndex
-                    finishIndex = min(bufferTask.lastIndex+1, finishIndex+MAX_LENGTH)
+                    finishIndex = min(bufferTask.lastIndex + 1, finishIndex + MAX_LENGTH)
                 }
 
             } else {
@@ -124,19 +146,17 @@ class TasksPrinter {
     }
 }
 
+@JsonClass(generateAdapter = false)
 class Task {
-    var priority: String = ""
-    var dateTime: LocalDateTime? = null
-    var buffer = mutableListOf<String>()
     var id: Int? = null
+    var priority: String = ""
+    var dateTime: String = ""
+    var buffer = mutableListOf<String>()
     var dueTag: String = ""
 
-    private val CORRECT_PRIORITIES = mutableListOf("C", "H", "N", "L")
-
     fun setPriority(inputPriority: String): Boolean {
-        val isPriorityCorrect: Boolean
         val element = inputPriority.trim().uppercase()
-        isPriorityCorrect = CORRECT_PRIORITIES.contains(element)
+        val isPriorityCorrect: Boolean = PRIORITY.isCorrectPriority(element)
 
         if (isPriorityCorrect) {
             priority = element
@@ -145,27 +165,78 @@ class Task {
         return isPriorityCorrect
     }
 
+    private fun getDateArrayFromString(date: String): List<Int> {
+        val dateTimeSplitted = date.split("T")
+
+        if(dateTimeSplitted.size != 2){
+            throw Exception("$dateTimeSplitted")
+        }
+
+        val splitDate = dateTimeSplitted[0].split("-")
+
+        if (splitDate.size != 3) {
+            throw Exception("$splitDate")
+        }
+
+        val year = splitDate[0].toInt()
+        val month = splitDate[1].toInt()
+        val day = splitDate[2].toInt()
+        return listOf(year, month, day)
+    }
+
+    private fun getTimeArrayFromString(time: String): List<Int> {
+        val split = time.split(":")
+
+        if (split.size != 2) {
+            throw Exception("$split")
+        }
+
+        val hour = split[0].toInt()
+        val minutes = split[1].toInt()
+
+        return listOf(hour, minutes)
+    }
+
     fun setDate(inputString: String): Boolean {
         var isDateCorrect = inputString.matches(Regex("\\d\\d\\d\\d-\\d{1,2}-\\d{1,2}"))
         if (!isDateCorrect) {
             println("The input date is invalid")
         } else {
-            val splitDate = inputString.split("-")
-            val year = splitDate[0].toInt()
-            val month = splitDate[1].toInt()
-            val day = splitDate[2].toInt()
+            val splitDate = getDateArrayFromString("${inputString}T00:00")
+            val year = splitDate[0]
+            val month = splitDate[1]
+            val day = splitDate[2]
             try {
-                dateTime = LocalDateTime(year, month, day, 0, 0)
+                if (dateTime.isEmpty()) {
+                    val tmpDateTime = LocalDateTime(year, month, day, 0, 0, 0)
+                    dateTime = tmpDateTime.toString()
+                } else {
+                    val currentDateTime = LocalDateTime.parse("$dateTime:00")
+                    val tmpDateTime = LocalDateTime(year, month, day, currentDateTime.hour, currentDateTime.minute)
+                    dateTime = tmpDateTime.toString()
+                }
+
                 this.dueTag = getDueTag()
-            } catch (e: DateTimeException) {
+            } catch (e: Exception) {
                 println("The input date is invalid")
                 isDateCorrect = false
-            } catch (e: java.lang.IllegalArgumentException) {
-                println("The input date is invalid")
-                isDateCorrect = false
+                dateTime = ""
             }
         }
         return isDateCorrect
+    }
+
+    private fun getLocalDateTimeFromString(date: String, time: String): LocalDateTime {
+        val splitDate = getDateArrayFromString(date)
+        val year = splitDate[0]
+        val month = splitDate[1]
+        val day = splitDate[2]
+
+        val splitTime: List<Int> = getTimeArrayFromString(time)
+        val hours = splitTime[0]
+        val minutes = splitTime[1]
+
+        return LocalDateTime(year, month, day, hours, minutes)
     }
 
     fun setTime(inputString: String): Boolean {
@@ -176,12 +247,8 @@ class Task {
         if (!isTimeCorrect) {
             println("The input time is invalid")
         } else {
-            val split = time.split(":")
             try {
-                val hour = split[0].toInt()
-                val minutes = split[1].toInt()
-                val tmp = LocalDateTime(dateTime!!.year, dateTime!!.month, dateTime!!.dayOfMonth, hour, minutes)
-                dateTime = tmp
+                dateTime = getLocalDateTimeFromString(dateTime, time).toString()
             } catch (e: DateTimeException) {
                 isTimeCorrect = false
                 println("The input time is invalid")
@@ -201,7 +268,8 @@ class Task {
 
     internal fun getDueTag(): String {
         val currentDate = Clock.System.now().toLocalDateTime(TimeZone.of("UTC+0")).date
-        val numberOfDays = currentDate.daysUntil(dateTime!!.date)
+        val localDateTime = LocalDateTime.parse("$dateTime:00")
+        val numberOfDays = currentDate.daysUntil(localDateTime.date)
 
         return if (numberOfDays == 0) {
             "T"
@@ -238,7 +306,7 @@ class Task {
         val divider = this.getTaskDivider()
         val subDivider = this.getTaskSubDivider()
 
-        val string = dateTime.toString().replace("T", " ")
+        val string = dateTime.replace("T", " ")
         stringBuilder.appendLine("${this.id}$divider$string $priority ${this.dueTag}")
 
         for (task in buffer) {
@@ -515,6 +583,8 @@ class CommandProcessor {
                 }
 
                 COMMAND_END -> {
+                    val taskSaver = TaskSaver()
+                    taskSaver.save()
                     println("Tasklist exiting!")
                 }
             }
@@ -528,8 +598,48 @@ class CommandProcessor {
     }
 }
 
+class TaskSaver() {
+    fun save() {
+        if (tasks.isEmpty()) {
+            return
+        }
+
+        val file = File("tasklist.json")
+        val moshi: Moshi = Moshi.Builder()
+            .addLast(KotlinJsonAdapterFactory())
+            .build()
+
+        val type = Types.newParameterizedType(MutableList::class.java, Task::class.java)
+        val adapter: JsonAdapter<MutableList<Task>> = moshi.adapter(type)
+        val jsonTasks = adapter.toJson(tasks)
+        file.writeText(jsonTasks)
+    }
+}
+
+class TaskLoader() {
+
+    fun load() {
+        val file = File("tasklist.json")
+        if (file.exists()) {
+            val moshi: Moshi = Moshi.Builder()
+                .addLast(KotlinJsonAdapterFactory())
+                .build()
+
+            val type = Types.newParameterizedType(MutableList::class.java, Task::class.java)
+            val adapter: JsonAdapter<MutableList<Task>> = moshi.adapter(type)
+            val tasksFromFile = adapter.fromJson(file.readText())
+            if (tasksFromFile != null) {
+                tasks = tasksFromFile
+            }
+        }
+    }
+
+}
+
 fun main() {
     val commandProcessor = CommandProcessor()
+    val taskLoader = TaskLoader()
+    taskLoader.load()
     while (true) {
         println("Input an action (${commandProcessor.SUPPLIED_COMMANDS.joinToString(", ")}):")
         val task = readln().trim().lowercase()
@@ -540,5 +650,3 @@ fun main() {
         }
     }
 }
-
-
