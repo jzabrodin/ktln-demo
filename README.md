@@ -1,4 +1,4 @@
-# ktln-task-list
-### Task list on kotlin
+# task-list
+https://hyperskill.org/projects/237
 * works via command line
-* can add, edit, remove, print tasks
+* can add, edit, remove, print, save, load tasks
